@@ -36,6 +36,7 @@ steps:
     when:
       - event: tag
         ref: refs/tags/aspd-*
+    failure: ignore
     depends_on: build-aspd
     image: quay.io/buildah/stable@sha256:64eb66966df97e361407aaa2d555cd10e50a38d5241c8b12b91779baa4741ca6
     environment:
@@ -51,8 +52,8 @@ steps:
       - echo $REGISTRY_LOGIN_TOKEN | buildah login -u registry --password-stdin registry.2nd.dev
       - buildah build -f ./.woodpecker/images/releases/aspd/Dockerfile --tag registry.2nd.dev/aspd:latest .
       - buildah push registry.2nd.dev/aspd:latest
-      - buildah tag registry.2nd.dev/aspd:latest "registry.2nd.dev/aspd:$(cat ../VERSION)"
-      - buildah push "registry.2nd.dev/aspd:$(cat ../VERSION)"
+      - buildah tag registry.2nd.dev/aspd:latest "registry.2nd.dev/aspd:$(cat VERSION)"
+      - buildah push "registry.2nd.dev/aspd:$(cat VERSION)"
 
   - name: release-aspd
     when:
