@@ -41,6 +41,7 @@ steps:
     when:
       - event: tag
         ref: refs/tags/bark-*
+    failure: ignore
     depends_on: build-bark
     image: quay.io/buildah/stable@sha256:64eb66966df97e361407aaa2d555cd10e50a38d5241c8b12b91779baa4741ca6
     environment:
@@ -62,14 +63,14 @@ steps:
       - buildah manifest add bark-multiarch registry.2nd.dev/bark:linux-arm64
       - buildah manifest add bark-multiarch registry.2nd.dev/bark:linux-armv7
       - buildah manifest push --all bark-multiarch docker://registry.2nd.dev/bark:latest
-      - buildah tag registry.2nd.dev/bark:linux-amd64 "registry.2nd.dev/bark:linux-amd64-$(cat ../VERSION)"
-      - buildah tag registry.2nd.dev/bark:linux-arm64 "registry.2nd.dev/bark:linux-arm64-$(cat ../VERSION)"
-      - buildah tag registry.2nd.dev/bark:linux-armv7 "registry.2nd.dev/bark:linux-armv7-$(cat ../VERSION)"
-      - buildah manifest create "bark-multiarch-$(cat ../VERSION)"
-      - buildah manifest add "bark-multiarch-$(cat ../VERSION)" "registry.2nd.dev/bark:linux-amd64-$(cat ../VERSION)"
-      - buildah manifest add "bark-multiarch-$(cat ../VERSION)" "registry.2nd.dev/bark:linux-arm64-$(cat ../VERSION)"
-      - buildah manifest add "bark-multiarch-$(cat ../VERSION)" "registry.2nd.dev/bark:linux-armv7-$(cat ../VERSION)"
-      - buildah manifest push --all "bark-multiarch-$(cat ../VERSION)" "docker://registry.2nd.dev/bark:$(cat ../VERSION)"
+      - buildah tag registry.2nd.dev/bark:linux-amd64 "registry.2nd.dev/bark:linux-amd64-$(cat VERSION)"
+      - buildah tag registry.2nd.dev/bark:linux-arm64 "registry.2nd.dev/bark:linux-arm64-$(cat VERSION)"
+      - buildah tag registry.2nd.dev/bark:linux-armv7 "registry.2nd.dev/bark:linux-armv7-$(cat VERSION)"
+      - buildah manifest create "bark-multiarch-$(cat VERSION)"
+      - buildah manifest add "bark-multiarch-$(cat VERSION)" "registry.2nd.dev/bark:linux-amd64-$(cat VERSION)"
+      - buildah manifest add "bark-multiarch-$(cat VERSION)" "registry.2nd.dev/bark:linux-arm64-$(cat VERSION)"
+      - buildah manifest add "bark-multiarch-$(cat VERSION)" "registry.2nd.dev/bark:linux-armv7-$(cat VERSION)"
+      - buildah manifest push --all "bark-multiarch-$(cat VERSION)" "docker://registry.2nd.dev/bark:$(cat VERSION)"
 
   - name: release-bark
     when:
