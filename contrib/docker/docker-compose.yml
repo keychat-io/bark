@@ -1,0 +1,196 @@
+services:
+  block-generator:
+    build:
+      context: ../../
+      dockerfile: contrib/docker/block_generator.Dockerfile
+    environment:
+      BITCOIN_RPC_USER: second
+      BITCOIN_RPC_PASSWORD: ark
+      BITCOIN_RPC_HOST: bitcoind
+      BITCOIN_RPC_PORT: 18443
+      BLOCK_FREQUENCY: 30
+    links:
+      - bitcoind
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    command: ["uv", "run", "/app/block_generator.py"]
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./contrib/block_generator/block_generator.py
+          target: /app/block_generator.py
+  bitcoind:
+    image:
+      bitcoin/bitcoin:29
+    command: [
+      "bitcoind",
+      "-regtest",
+      "-printtoconsole",
+      "-rpcbind=0.0.0.0",
+      "-rpcallowip=0.0.0.0/0",
+      "-fallbackfee=0.00001",
+      "-server",
+      "-txindex",
+      "-blockfilterindex",
+      "-coinstatsindex",
+      # The rpcauth can be generated using python /share/rpcauth/rpcauth.py in
+      # the bitcoin repository
+      #
+      # Note, that docker-compose requires you to escape the $
+      # This is done, by copying the $-sign and make it appear twice
+      "-rpcauth=second:23f161a911aa7a75e5ac78a8d41d5313$$cae8671bb16c4e6ac6fcf3e98195bf0a5de8ee9ec536471df3f5caf97bc16437"
+      ]
+    volumes:
+      - bitcoind:/home/bitcoin/.bitcoin
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./contrib/config/
+          target: /home/bitcoin/bitcoin.conf
+    ports:
+      - "18443:18443"
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "bitcoin-cli -regtest -rpcuser=second -rpcpassword=ark -rpcconnect=127.0.0.1 getblockchaininfo || exit 1"
+      ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  cln:
+    image: elementsproject/lightningd:v25.02
+    restart: on-failure
+    command:
+      - "--regtest"
+      - "--log-level=debug"
+      - "--grpc-host=0.0.0.0"
+      - "--bitcoin-datadir=/root/.bitcoin"
+      - "--bitcoin-rpcconnect=bitcoind:18443"
+      - "--bitcoin-rpcuser=second"
+      - "--bitcoin-rpcpassword=ark"
+    volumes:
+      - bitcoind:/root/.bitcoin
+      - cln:/root/.lightning
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres:/var/lib/postgresql/data
+  aspd-init:
+    build:
+      context: ../../
+      dockerfile: contrib/docker/aspd.Dockerfile
+    environment:
+      RUST_BACKTRACE: 1
+      ASPD__DATA_DIR: /data/aspd
+      ASPD__NETWORK: regtest
+      ASPD__BITCOIND__URL: bitcoind:18443
+      ASPD__BITCOIND__RPC_USER: second
+      ASPD__BITCOIND__RPC_PASS: ark
+      ASPD__CLN_ARRAY: >-
+        [
+          {
+            "uri": "https://cln:9736",
+            "priority": 1,
+            "server_cert_path": "/data/cln/regtest/ca.pem",
+            "client_cert_path": "/data/cln/regtest/client.pem",
+            "client_key_path": "/data/cln/regtest/client-key.pem"
+          }
+        ]
+      ASPD__POSTGRES__HOST: postgres
+      ASPD__POSTGRES__USER: postgres
+      ASPD__POSTGRES__PASSWORD: postgres
+    entrypoint: ["sh", "/create_if_not_exists.sh"]
+    volumes:
+      - aspd:/data/aspd
+      - cln:/data/cln
+    links:
+      - bitcoind
+      - postgres
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+      cln:
+        condition: service_started
+      postgres:
+        condition: service_started
+  aspd:
+    build:
+      context: ../../
+      dockerfile: contrib/docker/aspd.Dockerfile
+    environment:
+      RUST_BACKTRACE: 1
+      ASPD__DATA_DIR: /data/aspd
+      ASPD__NETWORK: regtest
+      ASPD__BITCOIND__URL: bitcoind:18443
+      ASPD__BITCOIND__RPC_USER: second
+      ASPD__BITCOIND__RPC_PASS: ark
+      ASPD__CLN_ARRAY: >-
+        [
+          {
+            "uri": "https://cln:9736",
+            "priority": 1,
+            "server_cert_path": "/data/cln/regtest/ca.pem",
+            "client_cert_path": "/data/cln/regtest/client.pem",
+            "client_key_path": "/data/cln/regtest/client-key.pem"
+          }
+        ]
+      ASPD__POSTGRES__HOST: postgres
+      ASPD__POSTGRES__USER: postgres
+      ASPD__POSTGRES__PASSWORD: postgres
+      ASPD__RPC__PUBLIC_ADDRESS: "0.0.0.0:3535"
+    volumes:
+      - aspd:/data/aspd
+      - cln:/data/cln
+    depends_on:
+      aspd-init:
+        condition: service_completed_successfully
+    links:
+      - bitcoind
+      - postgres
+    command: ["start"]
+    ports:
+      - "3535:3535"
+  bark-init:
+    build:
+     context: ../../
+     dockerfile: contrib/docker/bark.Dockerfile
+    environment:
+      RUST_BACKTRACE: 1
+      ASPD_URL: "http://aspd:3535"
+      BITCOIND_URL: "http://bitcoind:18443"
+      BITCOIND_RPC_USER: second
+      BITCOIND_RPC_PASS: ark
+    entrypoint: [ "sh", "/create_if_not_exists.sh" ]
+    volumes:
+      - bark:/root
+    depends_on:
+      aspd:
+        condition: service_started
+  bark:
+    build:
+      context: ../../
+      dockerfile: contrib/docker/bark.Dockerfile
+    environment:
+      RUST_BACKTRACE: 1
+      ASPD_URL: "http://aspd:3535"
+      BITCOIND_URL: "http://bitcoind:18443"
+      BITCOIND_USER: second
+      BITCOIND_PASS: ark
+    volumes:
+      - bark:/root
+    depends_on:
+      bark-init:
+        condition: service_completed_successfully
+
+volumes:
+  aspd:
+  bark:
+  bitcoind:
+  cln:
+  postgres:
