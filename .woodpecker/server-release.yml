@@ -107,10 +107,9 @@ steps:
       - sha256sum "captaind-$(cat ../VERSION)-linux-x86_64" > SHA256SUMS
       - sha256sum "watchmand-$(cat ../VERSION)-linux-x86_64" >> SHA256SUMS
 
-  - name: publish-server
+  - name: publish-server-forgejo
     when:
-      - event: tag
-        ref: refs/tags/server-*
+      - evaluate: 'CI_PIPELINE_EVENT == "tag" && CI_COMMIT_REF contains "refs/tags/server-" && CI_REPO_URL != "https://gitlab.com/ark-bitcoin/bark"'
     depends_on: release-server
     image: woodpeckerci/plugin-release@sha256:f746ad9a4e652d7b793d6aafdab3df01e7640abf66b49333ebae26edd1678c64
     settings:
@@ -121,5 +120,13 @@ steps:
       api_key:
         from_secret: RELEASE
 
-depends_on:
-  - helpers
+  - name: publish-server-gitlab
+    when:
+      - evaluate: 'CI_PIPELINE_EVENT == "tag" && CI_COMMIT_REF contains "refs/tags/server-" && CI_REPO_URL == "https://gitlab.com/ark-bitcoin/bark"'
+    depends_on: release-server
+    image: registry.2nd.dev/build:25
+    environment:
+      GITLAB_RELEASE_TOKEN:
+        from_secret: GITLAB_RELEASE_TOKEN
+    commands:
+      - bash ./contrib/ci-gitlab-release.sh "./target/captaind-*-linux-x86_64 ./target/watchmand-*-linux-x86_64 ./target/SHA256SUMS"
