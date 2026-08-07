@@ -455,6 +455,7 @@ impl TestContext {
 			} else {
 				true
 			},
+			round_legacy_hashlock_clauses: false,
 		}
 	}
 
