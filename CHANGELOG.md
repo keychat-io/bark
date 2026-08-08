@@ -6,6 +6,30 @@ https://docs.second.tech/changelog/changelog/
 
 Below is a more detailed summary for each version.
 
+# v0.6.1
+
+- `ark-lib`
+  - Calculate ppm-expiry fees independent of the VTXO order
+    With a fee-chargeable amount below the sum of the VTXOs, one VTXO is only
+    partially charged, so the fee depended on the order they were passed in: a
+    wallet pricing its inputs soonest-expiring first disagreed with a server
+    charging them in the order they arrived, and send-onchain payments failed.
+    [#2372](https://gitlab.com/ark-bitcoin/bark/-/merge_requests/2372)
+
+- `bark`
+  - bugfix: fix inability to finish delegated refreshes scheduled before v0.6.0
+    [#2378](https://gitlab.com/ark-bitcoin/bark/-/merge_requests/2378)
+
+- `server`
+  - Keep the excess when a client overpays an offboard fee
+    A client that calculated its fee against a different chain tip can land in another
+    ppm-expiry bracket and overpay, which used to fail the offboard outright. The
+    onchain output stays the amount the client asked for, and the surplus is ours -
+    the same way refresh and lightning send already treat their fees.
+    [#2372](https://gitlab.com/ark-bitcoin/bark/-/merge_requests/2372)
+  - bugfix: correctly handle forfeits for delegated refreshes scheduled before v0.6.0
+    [#2378](https://gitlab.com/ark-bitcoin/bark/-/merge_requests/2378)
+
 # v0.6.0
 
 - `server`
